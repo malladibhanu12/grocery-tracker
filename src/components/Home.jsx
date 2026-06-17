@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { Package } from 'lucide-react'
+import { Package, Search, X } from 'lucide-react'
 import ReceiptDetail from './ReceiptDetail'
 
 export default function Home({ user }) {
@@ -8,6 +8,10 @@ export default function Home({ user }) {
   const [monthTotal, setMonthTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [selectedReceipt, setSelectedReceipt] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   useEffect(() => {
     fetchReceipts()
@@ -50,8 +54,21 @@ export default function Home({ user }) {
     return date.toLocaleDateString('en-DE', { weekday: 'long', day: 'numeric', month: 'short' })
   }
 
+  // Apply search + date filters
+  const filteredReceipts = receipts.filter(r => {
+    const matchesSearch = searchQuery.trim() === '' ||
+      r.store_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.items.some(i => i.product_name?.toLowerCase().includes(searchQuery.toLowerCase()))
+
+    const receiptDate = new Date(r.purchase_date)
+    const matchesFrom = !dateFrom || receiptDate >= new Date(dateFrom)
+    const matchesTo = !dateTo || receiptDate <= new Date(dateTo)
+
+    return matchesSearch && matchesFrom && matchesTo
+  })
+
   const grouped = {}
-  receipts.forEach(r => {
+  filteredReceipts.forEach(r => {
     const date = r.purchase_date
     if (!grouped[date]) grouped[date] = []
     grouped[date].push(r)
@@ -62,14 +79,95 @@ export default function Home({ user }) {
     fetchReceipts()
   }
 
+  const clearFilters = () => {
+    setSearchQuery('')
+    setDateFrom('')
+    setDateTo('')
+    setShowSearch(false)
+  }
+
+  const hasActiveFilters = searchQuery.trim() !== '' || dateFrom || dateTo
+
   return (
     <div style={{ padding: '24px 18px 100px', minHeight: '100vh', background: '#0D0F14', color: '#F5F1E8' }}>
-      <div style={{ marginBottom: 4, color: '#9A9AA8', fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' }}>
-        This Month
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ marginBottom: 4, color: '#9A9AA8', fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' }}>
+            This Month
+          </div>
+          <h1 style={{ fontSize: 38, fontWeight: 700, marginBottom: 24 }}>
+            €{monthTotal.toFixed(2)}
+          </h1>
+        </div>
+        <button
+          onClick={() => setShowSearch(!showSearch)}
+          style={{
+            background: showSearch || hasActiveFilters ? 'rgba(212,175,55,0.15)' : '#1A1D26',
+            border: '1px solid #2A2E3A', borderRadius: 12, width: 42, height: 42,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4
+          }}
+        >
+          <Search size={18} color={showSearch || hasActiveFilters ? '#D4AF37' : '#9A9AA8'} />
+        </button>
       </div>
-      <h1 style={{ fontSize: 38, fontWeight: 700, marginBottom: 24 }}>
-        €{monthTotal.toFixed(2)}
-      </h1>
+
+      {showSearch && (
+        <div style={{ background: '#1A1D26', border: '1px solid #2A2E3A', borderRadius: 16, padding: 16, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Search size={16} color="#5E5E6E" />
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search store or product..."
+              style={{
+                flex: 1, background: 'none', border: 'none', color: '#F5F1E8',
+                fontSize: 14, outline: 'none'
+              }}
+              autoFocus
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 11, color: '#9A9AA8' }}>From</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                style={{
+                  width: '100%', background: '#232733', border: 'none', borderRadius: 8,
+                  padding: '8px 10px', color: '#F5F1E8', fontSize: 13, marginTop: 4, outline: 'none'
+                }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 11, color: '#9A9AA8' }}>To</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+                style={{
+                  width: '100%', background: '#232733', border: 'none', borderRadius: 8,
+                  padding: '8px 10px', color: '#F5F1E8', fontSize: 13, marginTop: 4, outline: 'none'
+                }}
+              />
+            </div>
+          </div>
+
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              style={{
+                width: '100%', marginTop: 12, padding: 10, background: 'none',
+                border: '1px solid #2A2E3A', borderRadius: 8, color: '#9A9AA8',
+                fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+              }}
+            >
+              <X size={14} /> Clear filters
+            </button>
+          )}
+        </div>
+      )}
 
       <div style={{
         height: 1,
@@ -79,15 +177,19 @@ export default function Home({ user }) {
       }} />
 
       <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: '#9A9AA8', letterSpacing: 0.5 }}>
-        RECENT ACTIVITY
+        {hasActiveFilters ? `RESULTS (${filteredReceipts.length})` : 'RECENT ACTIVITY'}
       </h2>
 
       {loading && <p style={{ color: '#9A9AA8' }}>Loading...</p>}
 
-      {!loading && receipts.length === 0 && (
+      {!loading && filteredReceipts.length === 0 && (
         <div style={{ textAlign: 'center', color: '#9A9AA8', marginTop: 80 }}>
-          <p style={{ fontSize: 16, marginBottom: 8 }}>No receipts yet</p>
-          <p style={{ fontSize: 13 }}>Your purchases will appear here once you add one</p>
+          <p style={{ fontSize: 16, marginBottom: 8 }}>
+            {hasActiveFilters ? 'No matching receipts' : 'No receipts yet'}
+          </p>
+          <p style={{ fontSize: 13 }}>
+            {hasActiveFilters ? 'Try adjusting your search or date range' : 'Your purchases will appear here once you add one'}
+          </p>
         </div>
       )}
 
