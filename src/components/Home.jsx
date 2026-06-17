@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Package } from 'lucide-react'
+import ReceiptDetail from './ReceiptDetail'
 
 export default function Home({ user }) {
   const [receipts, setReceipts] = useState([])
   const [monthTotal, setMonthTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [selectedReceipt, setSelectedReceipt] = useState(null)
 
   useEffect(() => {
     fetchReceipts()
@@ -55,6 +57,11 @@ export default function Home({ user }) {
     grouped[date].push(r)
   })
 
+  const handleUpdated = () => {
+    setSelectedReceipt(null)
+    fetchReceipts()
+  }
+
   return (
     <div style={{ padding: '24px 18px 100px', minHeight: '100vh', background: '#0D0F14', color: '#F5F1E8' }}>
       <div style={{ marginBottom: 4, color: '#9A9AA8', fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' }}>
@@ -94,11 +101,15 @@ export default function Home({ user }) {
             const total = receipt.items.reduce((s, i) => s + (i.price * i.quantity), 0)
 
             return (
-              <div key={receipt.id} style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                background: '#1A1D26', borderRadius: 14, padding: 16, marginBottom: 8,
-                border: '1px solid #2A2E3A'
-              }}>
+              <div
+                key={receipt.id}
+                onClick={() => setSelectedReceipt(receipt)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  background: '#1A1D26', borderRadius: 14, padding: 16, marginBottom: 8,
+                  border: '1px solid #2A2E3A', cursor: 'pointer'
+                }}
+              >
                 <div style={{
                   width: 44, height: 44, borderRadius: 12, background: 'rgba(212,175,55,0.1)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -120,6 +131,14 @@ export default function Home({ user }) {
           })}
         </div>
       ))}
+
+      {selectedReceipt && (
+        <ReceiptDetail
+          receipt={selectedReceipt}
+          onClose={() => setSelectedReceipt(null)}
+          onUpdated={handleUpdated}
+        />
+      )}
     </div>
   )
 }
