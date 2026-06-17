@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import Tesseract from 'tesseract.js'
 import { X, Plus, Trash2, Camera } from 'lucide-react'
 
 export default function AddReceipt({ user, onSaved, onClose }) {
@@ -19,8 +18,20 @@ export default function AddReceipt({ user, onSaved, onClose }) {
     setScanning(true)
 
     try {
-      const result = await Tesseract.recognize(file, 'deu')
-      const text = result.data.text
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result.split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+
+      const { data, error } = await supabase.functions.invoke('scan-receipt', {
+        body: { imageBase64: base64 }
+      })
+
+      if (error) throw error
+
+      const text = data.text || ''
       const lines = text.split('\n').filter(l => l.trim())
       const priceRegex = /(\d+[,.]\d{2})/
 
